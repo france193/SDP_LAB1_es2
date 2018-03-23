@@ -30,17 +30,19 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define N 50
+
+void eraseString(char *string, int size);
+
 int main(int argc, char **argv) {
     fprintf(stdout, "> Start\n");
 
     int C;
-    char dirname[20];
+    char dirname[N];
     char *filename = "list.txt";
 
     FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
+    char line[N];
 
     if (argc != 3) {
         fprintf(stdout, "Expected 3 argument: <prog_name> <C> <dirname>\n");
@@ -53,7 +55,7 @@ int main(int argc, char **argv) {
     fprintf(stdout, "> Input args: %d, %s\n", C, dirname);
 
     // initialize a string for command
-    char cmd[30];
+    char cmd[N];
     strcpy(cmd, "ls ./");
     strcat(cmd, dirname);
     strcat(cmd, " > ");
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
     }
 
     int totalFiles = 0;
-    while ((getline(&line, &len, fp)) != -1) {
+    while (fgets(line, N, fp) != NULL) {
         totalFiles++;
     }
     fclose(fp);
@@ -84,11 +86,8 @@ int main(int argc, char **argv) {
 
     char temp[50];
     int status, numChild = 0;
-    while ((read = getline(&line, &len, fp)) != -1) {
-        strcpy(temp, "/0");
+    while (fgets(line, N, fp) != NULL) {
         fprintf(stdout, "> File: %s\n", line);
-        //printf("Retrieved line of length %zu :\n", read);
-        //printf("%s", line);
 
         if (totalFiles > 0) {
             if (numChild >= C) {
@@ -106,13 +105,16 @@ int main(int argc, char **argv) {
                 switch (pid) {
                     case 0:
                         // child
-                        strcpy(temp, "./");
-                        strcat(temp, dirname);
-                        strcat(temp, "/");
-                        strcat(temp, line);
+                        eraseString(temp, 50);
+
+                        //line[strlen(line)-1] = '\0';
+
+                        sprintf(temp, "./%s/%s", dirname, line);
 
                         char name[20];
                         sprintf(name, "mySort(%i)", getpid());
+
+                        fprintf(stdout, "%s", temp);
 
                         int res = execlp("sort", name, "-n", "-o", temp, temp, (char *)NULL);
 
@@ -140,4 +142,10 @@ int main(int argc, char **argv) {
 
     fclose(fp);
     return 0;
+}
+
+void eraseString(char *string, int size) {
+    for (int i=0; i<size; i++) {
+        string[i] = (char) '\0';
+    }
 }
