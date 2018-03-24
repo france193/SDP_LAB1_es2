@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
     char dirname[N];
     char *filename = "list.txt";
 
-    FILE *fp;
-    char line[N];
+    FILE *fp, *fp1, *fp2;
+    char line[N], line1[N];
 
     if (argc != 3) {
         fprintf(stdout, "Expected 3 argument: <prog_name> <C> <dirname>\n");
@@ -72,75 +72,121 @@ int main(int argc, char **argv) {
         exit(-3);
     }
 
+    // count total files
     int totalFiles = 0;
     while (fgets(line, N, fp) != NULL) {
         totalFiles++;
     }
-    fclose(fp);
     fprintf(stdout, "> Total files: %d\n", totalFiles);
 
-    if ((fp = fopen(filename, "rt")) == NULL) {
-        fprintf(stdout, "Error creating file\n");
-        exit(-4);
-    }
+    // fp point to start of the file
+    rewind(fp);
 
     char temp[50];
     int status, numChild = 0;
+
+    // while a new file exists
     while (fgets(line, N, fp) != NULL) {
         fprintf(stdout, "> File: %s\n", line);
 
-        if (totalFiles > 0) {
-            if (numChild >= C) {
-                // wait for a child termination
-                wait(&status);
-                numChild--;
+        // if I have more than max tthread running
+        if (numChild >= C) {
+            // wait for a child termination
+            wait(&status);
+            numChild--;
 
-                if (status != 0) {
-                    fprintf(stdout, "Error, child error\n");
-                    exit(-4);
-                }
-            } else {
-                int pid = fork();
-
-                switch (pid) {
-                    case 0:
-                        // child
-                        eraseString(temp, 50);
-
-                        //line[strlen(line)-1] = '\0';
-
-                        sprintf(temp, "./%s/%s", dirname, line);
-
-                        char name[20];
-                        sprintf(name, "mySort(%i)", getpid());
-
-                        fprintf(stdout, "%s", temp);
-
-                        int res = execlp("sort", name, "-n", "-o", temp, temp, (char *)NULL);
-
-                        if (res < 0) {
-                            fprintf(stdout, "Error, exec error\n");
-                            exit(-6);
-                        }
-                        break;
-
-                    case -1:
-                        // error
-                        fprintf(stdout, "Error, fork error\n");
-                        exit(-5);
-
-                    default:
-                        // father
-                        numChild++;
-                        totalFiles--;
-                        break;
-
-                }
+            if (status != 0) {
+                fprintf(stdout, "Error, child error\n");
+                exit(-4);
             }
+        }
+
+        int pid = fork();
+
+        switch (pid) {
+            case 0:
+                // child
+
+                eraseString(temp, 50);
+
+                // terminate read string line
+                line[strlen(line)-1] = '\0';
+
+                sprintf(temp, "./%s/%s", dirname, line);
+
+                char name[20];
+                sprintf(name, "mySort(%i)", getpid());
+
+                fprintf(stdout, "%s", temp);
+
+                int res = execlp("sort", name, "-n", "-o", temp, temp, (char *)NULL);
+
+                if (res < 0) {
+                    fprintf(stdout, "Error, exec error\n");
+                    exit(-6);
+                }
+                break;
+
+            case -1:
+                // error
+                fprintf(stdout, "Error, fork error\n");
+                exit(-5);
+
+            default:
+                // father
+
+                numChild++;
+                break;
         }
     }
 
+    while (numChild > 0) {
+        // wait for all remaining childrens' termination
+        wait(&status);
+        numChild--;
+
+        if (status != 0) {
+            fprintf(stdout, "Error, child error\n");
+            exit(-4);
+        }
+    }
+
+    // fp point to start of the file
+    rewind(fp);
+
+    if ((fp2 = fopen("all_sorted.txt", "w+")) == NULL) {
+        fprintf(stdout, "Error creating file\n");
+        exit(-3);
+    }
+
+    // main create unique file
+    while (fgets(line, N, fp) != NULL) {
+        eraseString(temp, 50);
+
+        // terminate read string line
+        line[strlen(line)-1] = '\0';
+
+        sprintf(temp, "./%s/%s", dirname, line);
+
+        if ((fp1 = fopen(temp, "rt")) == NULL) {
+            fprintf(stdout, "Error creating file\n");
+            exit(-3);
+        }
+
+        while (fgets(line1, N, fp1) != NULL) {
+            // terminate read string line
+            line1[strlen(line1)-1] = '\0';
+            fprintf(fp2, "%s\n", line1);
+        }
+
+        fclose(fp1);
+    }
+
+    fclose(fp2);
     fclose(fp);
+
+    system("sort -n -o all_sorted.txt all_sorted.txt");
+
     return 0;
 }
 
